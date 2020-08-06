@@ -208,6 +208,7 @@ namespace H_Czech_Under_Body_Image_Acquisition_W
             {
                 try
                 {
+                    Console.Write("");
                     return Math.Round((1000.0 / FrameRate));
                 }
                 catch
