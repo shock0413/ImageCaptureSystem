@@ -122,6 +122,7 @@ namespace H_Czech_Under_Body_Image_Acquisition_W
                     PacketSizeVisi = Visibility.Collapsed;
                     InterPacketVisi = Visibility.Collapsed;
                     SensorReadoutModeVisi = Visibility.Visible;
+                    m_imageProvider.SetSequencerMode(false);
                 }
 
                 string[] split = currentCamera.Name.Split('-');

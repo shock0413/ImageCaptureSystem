@@ -857,7 +857,14 @@ namespace PylonC.NETSupportLibrary
         {
             try
             {
-                Pylon.DeviceSetBooleanFeature(m_hDevice, "SetSequencerMode", value);
+                if (value)
+                {
+                    Pylon.DeviceFeatureFromString(m_hDevice, "SequencerMode", "On");
+                }
+                else
+                {
+                    Pylon.DeviceFeatureFromString(m_hDevice, "SequencerMode", "Off");
+                }
             }
             catch
             {
