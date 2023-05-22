@@ -110,7 +110,7 @@ namespace PylonC.NETSupportLibrary
             Open(Pylon.CreateDeviceByIndex(index));
         }
 
-        public void SetPacketSize(long value)
+        public void SetPacketSize(int value)
         {
             if (Pylon.DeviceFeatureIsWritable(m_hDevice, "GevSCPSPacketSize"))
             {
@@ -119,14 +119,14 @@ namespace PylonC.NETSupportLibrary
             }
         }
 
-        public long GetPacketSize()
+        public int GetPacketSize()
         {
-            long value = 1500;
+            int value = 1500;
 
             if (Pylon.DeviceFeatureIsReadable(m_hDevice, "GevSCPSPacketSize"))
             {
                 /* ... The device supports the packet size feature. Set a value. */
-                value = Pylon.DeviceGetIntegerFeature(m_hDevice, "GevSCPSPacketSize");
+                value = Convert.ToInt32(Pylon.DeviceGetIntegerFeature(m_hDevice, "GevSCPSPacketSize"));
             }
 
             return value;
@@ -540,6 +540,8 @@ namespace PylonC.NETSupportLibrary
 
                 while (m_grabThreadRun) /* Is set to false when stopping to end the grab thread. */
                 {
+                    try
+                    {
                         /* Wait for the next buffer to be filled. Wait up to 15000 ms. */
                         if (!Pylon.WaitObjectWait(m_hWait, 15000))
                         {
@@ -556,8 +558,8 @@ namespace PylonC.NETSupportLibrary
                         }
 
                         PylonGrabResult_t grabResult; /* Stores the result of a grab operation. */
-                                                      /* Since the wait operation was successful, the result of at least one grab
-                                                         operation is available. Retrieve it. */
+                        /* Since the wait operation was successful, the result of at least one grab
+                           operation is available. Retrieve it. */
                         if (!Pylon.StreamGrabberRetrieveResult(m_hGrabber, out grabResult))
                         {
                             /* Oops. No grab result available? We should never have reached this point.
@@ -596,6 +598,18 @@ namespace PylonC.NETSupportLibrary
                             */
                             throw new Exception(string.Format("A grab failure occurred. See the method ImageProvider::Grab for more information. The error code is {0:X08}.", grabResult.ErrorCode));
                         }
+                    }
+                    catch (Exception e)
+                    {
+                        CleanUpGrab();
+                        string lastErrorMessage = GetLastErrorText();
+                        if (!m_removed) /* In case the device was removed from the PC suppress the notification. */
+                        {
+                            /* Notify that the grabbing had errors and deliver the information. */
+                            OnGrabErrorEvent(e, lastErrorMessage);
+                        }
+                        SetupGrab();
+                    }
 
                 }
 
@@ -872,12 +886,43 @@ namespace PylonC.NETSupportLibrary
             }
         }
 
+        public void SetGainSelectorDigital(DeviceEnumerator.Device device)
+        {
+            Pylon.DeviceFeatureFromString(m_hDevice, "GainSelector", "DigitalAll");
+        }
+
+        public void SetGainSelectorAnalogue(DeviceEnumerator.Device device)
+        {
+            Pylon.DeviceFeatureFromString(m_hDevice, "GainSelector", "AnalogAll");
+        }
+
         public void SetGain(int value, DeviceEnumerator.Device device)
         {
             try
             {
                 if (device.DeviceClass.Equals("BaslerGigE"))
                 {
+                    SetGainSelectorAnalogue(device);
+                    Pylon.DeviceSetIntegerFeature(m_hDevice, "GainRaw", value);
+                }
+                else if (device.DeviceClass.Equals("BaslerUsb"))
+                {
+                    Pylon.DeviceSetFloatFeature(m_hDevice, "Gain", value);
+                }
+            }
+            catch
+            {
+
+            }
+        }
+
+        public void SetDigitalGain(int value, DeviceEnumerator.Device device)
+        {
+            try
+            {
+                if (device.DeviceClass.Equals("BaslerGigE"))
+                {
+                    SetGainSelectorDigital(device);
                     Pylon.DeviceSetIntegerFeature(m_hDevice, "GainRaw", value);
                 }
                 else if (device.DeviceClass.Equals("BaslerUsb"))
@@ -966,10 +1011,23 @@ namespace PylonC.NETSupportLibrary
             Pylon.DeviceFeatureFromString(m_hDevice, "SensorReadoutMode", value);
         }
 
+
+        public void SetAutoPacketEnable(bool value)
+        {
+            try
+            {
+                Pylon.DeviceSetBooleanFeature(m_hDevice, "AutoPacketSize", value);
+                Console.WriteLine("Auto Packet Size Error : " + value);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("Auto Packet Size Error : " + e.Message);
+            }
+        }
+
         #endregion
 
         #region 파라미터 불러오기
-
 
         public long GetGain(DeviceEnumerator.Device device)
         {
@@ -977,6 +1035,7 @@ namespace PylonC.NETSupportLibrary
             {
                 if (device.DeviceClass.Equals("BaslerGigE"))
                 {
+                    SetGainSelectorAnalogue(device);
                     return Pylon.DeviceGetIntegerFeature(m_hDevice, "GainRaw");
                 }
                 else if (device.DeviceClass.Equals("BaslerUsb"))
@@ -999,6 +1058,7 @@ namespace PylonC.NETSupportLibrary
         {
             try
             {
+                /*
                 if (device.DeviceClass.Equals("BaslerGigE"))
                 {
                     return Pylon.DeviceGetIntegerFeatureMin(m_hDevice, "GainRaw");
@@ -1012,6 +1072,8 @@ namespace PylonC.NETSupportLibrary
                 {
                     return 0;
                 }
+                */
+                return 0;
             }
             catch
             {
@@ -1025,6 +1087,84 @@ namespace PylonC.NETSupportLibrary
             {
                 if (device.DeviceClass.Equals("BaslerGigE"))
                 {
+                    SetGainSelectorAnalogue(device);
+                    return Pylon.DeviceGetIntegerFeatureMax(m_hDevice, "GainRaw");
+                }
+                else if (device.DeviceClass.Equals("BaslerUsb"))
+                {
+                    double d = Pylon.DeviceGetFloatFeatureMax(m_hDevice, "Gain");
+                    return Convert.ToInt32(d);
+                }
+                else
+                {
+                    return 0;
+                }
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
+        public long GetDigitalGain(DeviceEnumerator.Device device)
+        {
+            try
+            {
+                if (device.DeviceClass.Equals("BaslerGigE"))
+                {
+                    SetGainSelectorDigital(device);
+                    return Pylon.DeviceGetIntegerFeature(m_hDevice, "GainRaw");
+                }
+                else if (device.DeviceClass.Equals("BaslerUsb"))
+                {
+                    double d = Pylon.DeviceGetFloatFeature(m_hDevice, "Gain");
+                    return Convert.ToInt32(d);
+                }
+                else
+                {
+                    return 0;
+                }
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
+        public long GetDigitalGainMin(DeviceEnumerator.Device device)
+        {
+            try
+            {
+                /*
+                if (device.DeviceClass.Equals("BaslerGigE"))
+                {
+                    return Pylon.DeviceGetIntegerFeatureMin(m_hDevice, "GainRaw");
+                }
+                else if (device.DeviceClass.Equals("BaslerUsb"))
+                {
+                    double d = Pylon.DeviceGetFloatFeatureMin(m_hDevice, "Gain");
+                    return Convert.ToInt32(d);
+                }
+                else
+                {
+                    return 0;
+                }
+                */
+                return 0;
+            }
+            catch
+            {
+                return 0;
+            }
+        }
+
+        public long GetDigitalGainMax(DeviceEnumerator.Device device)
+        {
+            try
+            {
+                if (device.DeviceClass.Equals("BaslerGigE"))
+                {
+                    SetGainSelectorDigital(device);
                     return Pylon.DeviceGetIntegerFeatureMax(m_hDevice, "GainRaw");
                 }
                 else if (device.DeviceClass.Equals("BaslerUsb"))
